@@ -1,7 +1,27 @@
 // Mindi Kot Client Application
 // Redesigned: Dedicated Seat Drop Zones, SVG Turn Rings, Winning Star & Live HUD
 
-const socket = io();
+// Determine socket connection target:
+const urlParams = new URLSearchParams(window.location.search);
+const queryServer = urlParams.get('server') || urlParams.get('host');
+if (queryServer) {
+  localStorage.setItem('mindi_server_url', queryServer);
+}
+const customServerUrl = queryServer || localStorage.getItem('mindi_server_url');
+
+let socket;
+if (customServerUrl && window.location.hostname.includes('netlify.app')) {
+  socket = io(customServerUrl, { transports: ['websocket', 'polling'] });
+} else {
+  socket = io();
+}
+
+socket.on('connect', () => {
+  console.log('Connected to Mindi Kot server:', socket.id);
+});
+socket.on('connect_error', (err) => {
+  console.warn('Socket connection error:', err.message);
+});
 
 // State
 let myPlayerId = null;
