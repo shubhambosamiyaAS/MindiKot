@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Mindi Kot Multiplayer | 2v2 & 3v3 Mobile</title>
+
+  <!-- PWA & Mobile Web App Meta -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#07170e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mindi Kot">
+
+  <!-- Google Fonts & Font Awesome -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+
+  <!-- PORTRAIT ROTATION GUARD OVERLAY -->
+  <div id="rotate-overlay" class="rotate-screen">
+    <div class="rotate-content">
+      <div class="phone-rotate-icon">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+      </div>
+      <h2>Please Rotate Your Phone</h2>
+      <p>Mindi Kot is designed for <strong>Landscape Mode</strong> for a rich casino card table experience.</p>
+      <button id="btn-force-landscape" class="btn btn-primary">
+        <i class="fa-solid fa-expand"></i> Enter Fullscreen & Rotate
+      </button>
+      <button id="btn-bypass-rotate" class="btn btn-secondary" style="margin-top: 10px; font-size: 0.75rem; padding: 6px 14px; opacity: 0.8;">
+        Continue Anyway (Desktop View)
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="app" class="app-container">
+
+    <!-- ==================== LOBBY SCREEN ==================== -->
+    <div id="lobby-screen" class="view-screen active">
+      <div class="lobby-card glass-panel">
+        <div class="brand-header">
+          <div class="brand-badge"><i class="fa-solid fa-crown"></i> INDIAN TRADITIONAL CARD GAME</div>
+          <h1>MINDI KOT</h1>
+          <p class="subtitle">Real-time Mobile Hotspot & Wi-Fi Multiplayer (2v2 & 3v3)</p>
+        </div>
+
+        <!-- Wi-Fi / Hotspot Share Capsule -->
+        <div id="hotspot-info-capsule" class="hotspot-info-capsule">
+          <div class="hotspot-info-left">
+            <span class="hotspot-icon"><i class="fa-solid fa-wifi"></i></span>
+            <div class="hotspot-text-group">
+              <span class="hotspot-label">HOTSPOT / WI-FI URL:</span>
+              <span id="hotspot-url-display" class="hotspot-url">Fetching...</span>
+            </div>
+          </div>
+          <div class="hotspot-action-group">
+            <button id="btn-copy-hotspot-url" class="btn-hotspot-action" title="Copy URL">
+              <i class="fa-solid fa-copy"></i> Copy
+            </button>
+            <button id="btn-show-qr" class="btn-hotspot-action" title="Show QR Code">
+              <i class="fa-solid fa-qrcode"></i> QR
+            </button>
+          </div>
+        </div>
+
+        <!-- Initial Form: Create or Join -->
+        <div id="lobby-auth-section" class="lobby-section">
+          <div class="tabs-control">
+            <button id="tab-btn-create" class="tab-btn active"><i class="fa-solid fa-plus-circle"></i> Create Room</button>
+            <button id="tab-btn-join" class="tab-btn"><i class="fa-solid fa-right-to-bracket"></i> Join Room</button>
+          </div>
+
+          <!-- Create Form -->
+          <div id="create-room-panel" class="tab-content active">
+            <div class="form-group">
+              <label><i class="fa-solid fa-user"></i> Your Player Name</label>
+              <input type="text" id="host-player-name" placeholder="Enter your name" maxlength="15" value="Captain">
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fa-solid fa-users"></i> Game Mode</label>
+                <select id="game-mode-select">
+                  <option value="2v2">2 vs 2 (4 Players - 1 Deck / 52 Cards)</option>
+                  <option value="3v3" selected>3 vs 3 (6 Players - 2 Decks / 102 Cards)</option>
+                </select>
+                <small class="helper-text">★ In 3v3, both Falli ki Dudi (♣2) are removed!</small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label><i class="fa-solid fa-shield"></i> Team A Name</label>
+                <input type="text" id="team-a-name" value="Lions" maxlength="15">
+              </div>
+              <div class="form-group">
+                <label><i class="fa-solid fa-shield-halved"></i> Team B Name</label>
+                <input type="text" id="team-b-name" value="Tigers" maxlength="15">
+              </div>
+            </div>
+
+            <button id="btn-create-room" class="btn btn-primary btn-block">
+              <i class="fa-solid fa-play"></i> Create Room & Enter Table
+            </button>
+          </div>
+
+          <!-- Join Form -->
+          <div id="join-room-panel" class="tab-content">
+            <div class="form-group">
+              <label><i class="fa-solid fa-user"></i> Your Player Name</label>
+              <input type="text" id="join-player-name" placeholder="Enter your name" maxlength="15" value="Player">
+            </div>
+
+            <div class="form-group">
+              <label><i class="fa-solid fa-key"></i> 4-Digit Room Code</label>
+              <input type="text" id="join-room-code" placeholder="e.g. ABCD" maxlength="4" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" style="text-transform: uppercase; letter-spacing: 6px; font-weight: 800; text-align: center;">
+            </div>
+
+            <button id="btn-join-room" class="btn btn-primary btn-block">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i> Join Room & Enter Table
+            </button>
+          </div>
+        </div>
+
+        <!-- Waiting Room / Seating Area -->
+        <div id="lobby-waiting-section" class="lobby-section hidden">
+          <div class="room-code-display">
+            <span class="code-lbl">ROOM CODE:</span>
+            <strong id="display-room-code">----</strong>
+            <button id="btn-copy-code" class="btn-copy" title="Copy Room Code"><i class="fa-regular fa-copy"></i> Copy</button>
+          </div>
+
+          <div class="seating-status-header">
+            <h3>Seated Players (<span id="player-count">1</span>/<span id="max-player-count">6</span>)</h3>
+            <p>Seating alternates: Team A ➔ Team B ➔ Team A ➔ Team B</p>
+          </div>
+
+          <div id="seats-grid" class="seats-grid">
+            <!-- Dynamic Seat Badges -->
+          </div>
+
+          <div class="lobby-actions">
+            <button id="btn-fill-bots" class="btn btn-secondary">
+              <i class="fa-solid fa-robot"></i> Fill Empty Seats With AI Bots
+            </button>
+            <button id="btn-start-game" class="btn btn-success" disabled>
+              <i class="fa-solid fa-gamepad"></i> Start Match Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== GAME TABLE SCREEN ==================== -->
+    <div id="game-screen" class="view-screen">
+
+      <!-- TOP HUD: FLOATING GLASS CAPSULE (MATCHING RADIAL ARENA DESIGN) -->
+      <header class="game-hud radial-hud">
+        <!-- Room & Mode Pill (Left) -->
+        <div class="hud-left-pill">
+          <span class="room-pill-code"><i class="fa-solid fa-hashtag"></i> <strong id="hud-room-code-tag">----</strong></span>
+          <span id="round-num-pill" class="round-pill">R1</span>
+        </div>
+
+        <!-- Center Match Score Capsule -->
+        <div class="hud-score-capsule">
+          <!-- Team Cyan (Team A) -->
+          <div class="capsule-team team-cyan-side">
+            <span class="team-led-dot cyan-dot"></span>
+            <span class="capsule-team-name" id="hdr-team-a-name">Cyan</span>
+            <div class="capsule-stat-group">
+              <span class="stat-badge mindi-badge" title="Mindis Captured">M: <strong id="hdr-team-a-mindis-count">0</strong></span>
+              <span class="stat-badge hath-badge" title="Haths Won">H: <strong id="hdr-team-a-hath">0</strong></span>
+              <span class="stat-badge pts-badge">Pts: <strong id="hdr-team-a-pts">0</strong></span>
+            </div>
+            <!-- Face up mini 10s captured -->
+            <div class="hud-mindi-tray" id="team-a-mindi-cards"></div>
+          </div>
+
+          <!-- Center Trick Counter & Hukum -->
+          <div class="capsule-center-info">
+            <div id="trick-count-pill" class="trick-count-pill">TRICK <strong id="current-trick-num">1</strong>/<span id="total-tricks-num">17</span></div>
+            <div id="hukum-badge" class="hukum-badge unrevealed">
+              <i class="fa-solid fa-lock"></i>
+              <span id="hukum-text">HUKUM: CLOSED</span>
+            </div>
+          </div>
+
+          <!-- Team Amber (Team B) -->
+          <div class="capsule-team team-amber-side">
+            <!-- Face up mini 10s captured -->
+            <div class="hud-mindi-tray" id="team-b-mindi-cards"></div>
+            <div class="capsule-stat-group">
+              <span class="stat-badge mindi-badge" title="Mindis Captured">M: <strong id="hdr-team-b-mindis-count">0</strong></span>
+              <span class="stat-badge hath-badge" title="Haths Won">H: <strong id="hdr-team-b-hath">0</strong></span>
+              <span class="stat-badge pts-badge">Pts: <strong id="hdr-team-b-pts">0</strong></span>
+            </div>
+            <span class="capsule-team-name" id="hdr-team-b-name">Amber</span>
+            <span class="team-led-dot amber-dot"></span>
+          </div>
+        </div>
+
+        <!-- Quick Controls (Right) -->
+        <div class="hud-controls">
+          <button id="btn-toggle-sound" class="btn-icon" title="Toggle Sound"><i class="fa-solid fa-volume-high"></i></button>
+          <button id="btn-toggle-fullscreen" class="btn-icon" title="Toggle Fullscreen"><i class="fa-solid fa-expand"></i></button>
+        </div>
+      </header>
+
+      <!-- CASINO ARENA: MIDNIGHT BLUE FELT & OUTSIDE SEATS -->
+      <main class="casino-arena radial-arena">
+        <!-- Other Players Arranged OUTSIDE Table Perimeter -->
+        <div id="table-seats" class="table-seats seats-6"></div>
+
+        <div class="poker-table radial-table">
+          <div class="felt-surface radial-felt">
+
+            <!-- Background Concentric Rings & Team Glowing Arcs -->
+            <div class="felt-ambient-graphics">
+              <div class="arena-ring outer-arena-ring"></div>
+              <div class="arena-ring inner-arena-ring"></div>
+              <div class="team-glow-arc cyan-arc"></div>
+              <div class="team-glow-arc amber-arc"></div>
+            </div>
+
+            <!-- 3D Center Deck (Ket) & Shuffle Stage -->
+            <div id="center-deck-stage" class="center-deck-stage hidden">
+              <!-- Top Instruction Banner -->
+              <div class="deck-instruction-banner">
+                <span id="deck-instruction-text" class="instruction-text">
+                  <i class="fa-solid fa-hand-pointer"></i> Ket par click karein baari lene ke liye!
+                </span>
+              </div>
+
+              <div class="deck-stage-body">
+                <!-- 3D Center Ket (Deck Stack) -->
+                <div class="deck-3d-wrapper" id="deck-3d-clickable" title="Click Ket to Cut & Take First Turn!">
+                  <div class="deck-card deck-shadow"></div>
+                  <div class="deck-card deck-layer-3"></div>
+                  <div class="deck-card deck-layer-2"></div>
+                  <div class="deck-card deck-layer-1"></div>
+                  <div class="deck-card deck-top-card" id="deck-top-card">
+                    <div class="card-back-ornate">
+                      <div class="deck-pattern-inner">
+                        <i class="fa-solid fa-crown deck-crown"></i>
+                        <span class="deck-label">MINDI KOT</span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Floating tap badge -->
+                  <div class="deck-cut-prompt">
+                    <span class="cut-hand-icon">👆</span>
+                    <span class="cut-label">TAP TO CUT</span>
+                  </div>
+                </div>
+
+                <!-- Action Buttons Beside Ket (Ket ke Baaju me) -->
+                <div class="deck-side-controls">
+                  <button id="btn-shuffle-deck" class="btn-shuffle-deck" title="Shuffle Cards">
+                    <i class="fa-solid fa-shuffle"></i>
+                    <span>Shuffle</span>
+                  </button>
+                  <div id="shuffle-count-badge" class="shuffle-count-badge">
+                    Shuffled: <strong id="shuffle-count-val">0</strong>x
+                  </div>
+                  <button id="btn-deal-deck" class="btn-deal-deck" title="Deal Cards to All Players">
+                    <i class="fa-solid fa-play"></i>
+                    <span>Deal Now</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Flying Deal Cards Animation Layer -->
+            <div id="dealing-cards-layer" class="dealing-cards-layer"></div>
+
+            <!-- Center Radial Trick Arena (Cards played inward in circular formation) -->
+            <div id="radial-trick-arena" class="radial-trick-arena">
+              <!-- Radial card slots generated dynamically -->
+            </div>
+
+            <!-- Lead Suit Indicator Floating Badge -->
+            <div id="lead-suit-indicator" class="lead-suit-indicator hidden">
+              <span class="lead-lbl">LEAD</span>
+              <strong id="lead-suit-char">♠</strong>
+            </div>
+
+            <!-- Live Game Announcement Toast -->
+            <div id="announcement-toast" class="announcement-toast hidden"></div>
+
+            <!-- Dramatic Hukum Reveal Splash Banner -->
+            <div id="hukum-splash" class="hukum-splash hidden">
+              <div class="hukum-splash-box">
+                <div class="hukum-splash-crown"><i class="fa-solid fa-crown"></i></div>
+                <div class="hukum-splash-title">👑 HUKUM REVEALED! 👑</div>
+                <div id="hukum-splash-suit" class="hukum-splash-suit">♠ SPADES</div>
+                <div id="hukum-splash-desc" class="hukum-splash-desc">Trump Declared</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- BOTTOM DOCK: YOUR AVATAR (LEFT) + PLAYER HAND & CONTROLS (RIGHT) -->
+      <footer class="player-dock">
+        <!-- Your Avatar Profile Card (Left side of cards) -->
+        <div id="my-player-dock-seat" class="my-dock-seat">
+          <!-- Dynamically populated with your avatar, name, team, chips & timer ring -->
+        </div>
+
+        <!-- Hand & Action Controls (Right side) -->
+        <div class="dock-cards-wrapper">
+          <div class="dock-header">
+            <!-- Suit Filter Tabs -->
+            <div class="suit-filters">
+              <button class="suit-filter-btn active" data-suit="ALL">All (<span id="count-all">0</span>)</button>
+              <button class="suit-filter-btn" data-suit="S">♠ Spades (<span id="count-S">0</span>)</button>
+              <button class="suit-filter-btn" data-suit="H">♥ Hearts (<span id="count-H">0</span>)</button>
+              <button class="suit-filter-btn" data-suit="D">♦ Diamonds (<span id="count-D">0</span>)</button>
+              <button class="suit-filter-btn" data-suit="C">♣ Clubs (<span id="count-C">0</span>)</button>
+            </div>
+
+            <!-- Turn Status & Action Button -->
+            <div class="turn-action-bar">
+              <span id="turn-status-text" class="turn-status-text">Waiting for your turn...</span>
+              <button id="btn-throw-selected" class="btn btn-throw hidden">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i> THROW SELECTED CARD
+              </button>
+            </div>
+          </div>
+
+          <!-- Scrollable Fanned Hand Cards Container -->
+          <div id="player-hand-cards" class="player-hand-cards">
+            <!-- Cards rendered dynamically -->
+          </div>
+        </div>
+      </footer>
+
+    </div>
+
+    <!-- ==================== ROUND SUMMARY MODAL ==================== -->
+    <div id="round-modal" class="modal-backdrop hidden">
+      <div class="modal-card glass-panel">
+        <div id="modal-kot-banner" class="kot-banner hidden">👑 KOT / COAT ACHIEVED! 👑</div>
+        <h2 id="modal-winner-title">Team Lions Won Round 1!</h2>
+        <p id="modal-win-reason" class="modal-reason">Lions captured 5 Mindis vs 3.</p>
+
+        <div class="modal-score-breakdown">
+          <div class="score-team-col team-a">
+            <h4 id="modal-team-a-name">Lions</h4>
+            <div class="score-row">Mindis: <strong id="modal-team-a-mindis">0</strong></div>
+            <div class="score-row">Hath: <strong id="modal-team-a-hath">0</strong></div>
+            <div class="score-row pts">Match Points: <strong id="modal-team-a-pts">0</strong></div>
+          </div>
+          <div class="vs-divider">VS</div>
+          <div class="score-team-col team-b">
+            <h4 id="modal-team-b-name">Tigers</h4>
+            <div class="score-row">Mindis: <strong id="modal-team-b-mindis">0</strong></div>
+            <div class="score-row">Hath: <strong id="modal-team-b-hath">0</strong></div>
+            <div class="score-row pts">Match Points: <strong id="modal-team-b-pts">0</strong></div>
+          </div>
+        </div>
+
+        <div id="match-winner-banner" class="match-winner-banner hidden">
+          🏆 <strong>MATCH WINNER DECLARED!</strong> 🏆
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-next-round" class="btn btn-primary btn-block">Start Next Round ➔</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hotspot QR Code Modal -->
+    <div id="qr-modal" class="modal-backdrop hidden">
+      <div class="modal-card glass-panel qr-modal-card">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-qrcode"></i> Scan to Join via Hotspot / Wi-Fi</h3>
+          <button id="btn-close-qr" class="btn-icon" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="qr-instructions">Apne mobile camera se scan karein aur hotspot se turant judein (No Internet Needed)!</p>
+        <div id="qrcode-container" class="qrcode-container"></div>
+        <div class="qr-url-pill">
+          <span id="qr-modal-url">http://...</span>
+          <button id="btn-copy-modal-url" class="btn-copy" title="Copy"><i class="fa-regular fa-copy"></i></button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="js/audio.js?v=3"></script>
+  <script src="js/app.js?v=4"></script>
+</body>
+</html>

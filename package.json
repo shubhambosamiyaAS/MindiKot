@@ -1,0 +1,17 @@
+{
+  "name": "mindi-kot-multiplayer",
+  "version": "1.0.0",
+  "description": "Mobile-first Landscape Mindi Kot Multiplayer Web Game (2v2 and 3v3 with Wi-Fi Hotspot / Local Network support)",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "node --watch server/server.js"
+  },
+  "keywords": ["mindi", "mindi-coat", "card-game", "multiplayer", "socket.io", "pwa"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

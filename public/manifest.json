@@ -1,0 +1,17 @@
+{
+  "name": "Mindi Kot Multiplayer",
+  "short_name": "MindiKot",
+  "description": "Mobile Landscape Mindi Kot Multiplayer Card Game",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0d1b13",
+  "theme_color": "#0d1b13",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23133620'/><text x='50' y='65' font-size='50' font-family='sans-serif' text-anchor='middle' fill='%23f1c40f'>🎴</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}
