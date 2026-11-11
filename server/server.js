@@ -6,18 +6,20 @@ const { Server } = require('socket.io');
 const { RoomManager } = require('./roomManager');
 
 const app = express();
+app.set('trust proxy', 1); // Enable proxy support for Render / Cloudflare SSL
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' }
+  cors: { origin: '*' },
+  transports: ['websocket', 'polling']
 });
 
-const PORT = process.env.PORT || 3000;
+let currentPort = parseInt(process.env.PORT, 10) || 3000;
 const roomManager = new RoomManager();
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Network Info API for Wi-Fi / Hotspot LAN Discovery
+// Network Info API for Wi-Fi / Hotspot LAN Discovery & Cloud Deployment (Render)
 app.get('/api/network-info', (req, res) => {
   const os = require('os');
   const nets = os.networkInterfaces();
@@ -32,10 +34,19 @@ app.get('/api/network-info', (req, res) => {
   }
 
   const primaryIp = ips.length > 0 ? ips[0].ip : 'localhost';
+  const boundPort = server.address() ? server.address().port : currentPort;
+
+  // Auto-detect Render or Cloud domain vs Local LAN IP
+  const hostHeader = req.get('host') || '';
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+  const isCloudHost = hostHeader.includes('onrender.com') || (hostHeader.includes('.') && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1') && !hostHeader.startsWith('192.168.') && !hostHeader.startsWith('10.'));
+  const cloudUrl = isCloudHost ? `${proto}://${hostHeader}` : null;
+
   res.json({
     primaryIp,
-    port: PORT,
-    hotspotUrl: `http://${primaryIp}:${PORT}`,
+    port: boundPort,
+    hotspotUrl: cloudUrl || `http://${primaryIp}:${boundPort}`,
+    isCloudHost,
     allIps: ips
   });
 });
@@ -52,6 +63,8 @@ function broadcastGameState(room) {
       const playerState = room.engine.getGameState(player.id);
       io.to(player.socketId).emit('game_state_update', {
         ...playerState,
+        // Hide private hand while dealing phase is active so cards never leak beforehand
+        myHand: room.isDealingPhase ? [] : playerState.myHand,
         myPlayerId: player.id,
         mySeatIndex: player.seatIndex,
         myTeam: player.team,
@@ -107,6 +120,13 @@ function checkAndTriggerBotTurn(room) {
       if (!room.engine.hukum) {
         // First cut: Choose best suit to declare Hukum!
         chosenCard = legalCards[0];
+      } else {
+        // Hukum is already declared! Cut with Trump if held
+        const trumpCards = botHand.filter((c) => c.suit === room.engine.hukum);
+        if (trumpCards.length > 0) {
+          // Cut with lowest trump card to win efficiently
+          chosenCard = trumpCards[trumpCards.length - 1];
+        }
       }
     }
 
@@ -134,8 +154,13 @@ function handleCardPlay(room, playerId, cardId) {
     hukumName: room.engine.getGameState().hukumName
   });
 
-  // Reset Turn Timer
-  resetTurnTimer(room);
+  // Reset Turn Timer if trick is ongoing, or pause timer during trick resolution
+  if (!result.trickCompleted) {
+    resetTurnTimer(room);
+  } else if (room.turnTimer) {
+    clearInterval(room.turnTimer);
+    room.turnTimer = null;
+  }
 
   if (result.trickCompleted) {
     room.isResolvingTrick = true;
@@ -173,6 +198,7 @@ function handleCardPlay(room, playerId, cardId) {
         // Clear trick table and broadcast next turn
         io.to(room.code).emit('trick_cleared', {});
         broadcastGameState(room);
+        resetTurnTimer(room);
       }
     }, trickDelay);
   } else {
@@ -206,43 +232,12 @@ function triggerStartDeal(room, firstTurnIndex, triggeredByName) {
   }, 2200);
 }
 
-// Turn Timer Management (30 seconds per turn)
+// Turn Timer (Removed as requested: Players have relaxed, unlimited time to play turns at their own pace)
 function resetTurnTimer(room) {
   if (room.turnTimer) {
     clearInterval(room.turnTimer);
     room.turnTimer = null;
   }
-
-  if (room.status !== 'PLAYING' || room.isDealingPhase || room.engine.isRoundOver) return;
-
-  room.turnTimeRemaining = 30;
-  io.to(room.code).emit('turn_timer_tick', { seconds: room.turnTimeRemaining });
-
-  room.turnTimer = setInterval(() => {
-    room.turnTimeRemaining--;
-    io.to(room.code).emit('turn_timer_tick', { seconds: room.turnTimeRemaining });
-
-    if (room.turnTimeRemaining <= 0) {
-      clearInterval(room.turnTimer);
-      room.turnTimer = null;
-
-      // Auto-play for timed-out player
-      const activePlayer = room.players[room.engine.currentTurnIndex];
-      if (activePlayer && !activePlayer.isBot) {
-        const hand = room.engine.hands[activePlayer.id] || [];
-        const legalCards = hand.filter((c) => room.engine.isCardLegal(activePlayer.id, c.id));
-        if (legalCards.length > 0) {
-          // Play lowest legal card
-          const autoCard = legalCards[legalCards.length - 1];
-          try {
-            handleCardPlay(room, activePlayer.id, autoCard.id);
-          } catch (e) {
-            console.error('Auto-play error:', e.message);
-          }
-        }
-      }
-    }
-  }, 1000);
 }
 
 // Socket.io Connection Events
@@ -350,6 +345,9 @@ io.on('connection', (socket) => {
     try {
       const room = roomManager.getRoom(data.roomCode);
       if (!room) throw new Error('Room not found');
+      if (room.status === 'PLAYING' && !room.engine.isRoundOver) {
+        throw new Error('Current round is still in progress!');
+      }
 
       room.isDealingPhase = true;
       room.shuffleCount = 0;
@@ -375,6 +373,10 @@ io.on('connection', (socket) => {
       const room = roomManager.getRoom(data.roomCode);
       if (!room || !room.isDealingPhase) return;
       room.shuffleCount = (room.shuffleCount || 0) + 1;
+
+      // Real re-shuffle: Re-creates & re-distributes cards across all players with high entropy
+      room.engine.shuffleAndDealCards();
+
       io.to(room.code).emit('deck_shuffled', {
         shuffleCount: room.shuffleCount
       });
@@ -415,6 +417,34 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 7. Leave Table
+  socket.on('leave_table', (data) => {
+    try {
+      const room = roomManager.getRoom(data.roomCode);
+      if (!room) return;
+      const playerIdx = room.players.findIndex((p) => p.id === data.playerId);
+      if (playerIdx !== -1) {
+        const player = room.players[playerIdx];
+        if (room.status === 'LOBBY') {
+          // If in lobby, remove player completely so seat is open for humans
+          room.players.splice(playerIdx, 1);
+        } else {
+          // In game: substitute with Bot
+          player.isBot = true;
+          player.name = `🤖 ${player.name.replace(/^[🤖\s]+/, '')}`;
+          player.socketId = null;
+        }
+        socket.leave(room.code);
+        if (room.status === 'PLAYING') {
+          broadcastGameState(room);
+        }
+        io.to(room.code).emit('lobby_update', roomManager.getLobbyState(room));
+      }
+    } catch (e) {
+      console.error('Leave table error:', e.message);
+    }
+  });
+
   // Disconnect
   socket.on('disconnect', () => {
     const result = roomManager.handleDisconnect(socket.id);
@@ -427,9 +457,34 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`===============================================`);
-  console.log(`🎴 MINDI KOT SERVER RUNNING on http://0.0.0.0:${PORT}`);
-  console.log(`📶 Connect via Local Wi-Fi / Hotspot IP on port ${PORT}`);
-  console.log(`===============================================`);
+const net = require('net');
+
+function findAvailablePort(startPort, callback) {
+  const tester = net.createServer()
+    .once('error', (err) => {
+      if (err.code === 'EADDRINUSE' || err.code === 'EACCES') {
+        console.warn(`⚠️ Port ${startPort} busy ya restricted hai, agla port ${startPort + 1} try kar rahe hain...`);
+        findAvailablePort(startPort + 1, callback);
+      } else {
+        callback(err);
+      }
+    })
+    .once('listening', () => {
+      tester.once('close', () => callback(null, startPort)).close();
+    })
+    .listen(startPort, '0.0.0.0');
+}
+
+findAvailablePort(currentPort, (err, portToUse) => {
+  if (err) {
+    console.error('Server start karne me error:', err);
+    process.exit(1);
+  }
+  currentPort = portToUse;
+  server.listen(portToUse, '0.0.0.0', () => {
+    console.log(`===============================================`);
+    console.log(`🎴 MINDI KOT SERVER RUNNING on http://localhost:${portToUse}`);
+    console.log(`📶 Connect via Local Wi-Fi / Hotspot IP on port ${portToUse}`);
+    console.log(`===============================================`);
+  });
 });

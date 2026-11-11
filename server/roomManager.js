@@ -75,6 +75,10 @@ class RoomManager {
       existingPlayer.socketId = socketId;
       existingPlayer.isConnected = true;
       if (playerName) existingPlayer.name = playerName;
+      // If host reconnected, sync hostSocketId so host controls continue working
+      if (existingPlayer.seatIndex === 0 || existingPlayer.sessionToken === room.hostSessionToken) {
+        room.hostSocketId = socketId;
+      }
       return { room, player: existingPlayer, isReconnection: true };
     }
 
@@ -137,7 +141,8 @@ class RoomManager {
   fillWithBots(roomCode, hostSocketId) {
     const room = this.getRoom(roomCode);
     if (!room) throw new Error('Room not found');
-    if (room.hostSocketId !== hostSocketId) throw new Error('Only host can add bots');
+    const isHost = room.hostSocketId === hostSocketId || (room.players[0] && room.players[0].socketId === hostSocketId);
+    if (!isHost) throw new Error('Only host can add bots');
 
     const botNames = ['Kabir', 'Aarav', 'Riya', 'Vikram', 'Pooja', 'Rohan'];
     let nameIdx = 0;

@@ -54,7 +54,7 @@ html, body {
   padding: 24px;
 }
 
-@media screen and (orientation: portrait) {
+@media screen and (orientation: portrait) and (max-width: 900px) and (pointer: coarse) {
   body:not(.bypass-rotate) .rotate-screen { display: flex; }
   body:not(.bypass-rotate) .app-container { display: none !important; }
 }
@@ -1032,10 +1032,10 @@ body.bypass-rotate .app-container { display: flex !important; }
   right: 16px;
 }
 
-/* 4-Player (2v2 Mode): Seat 0 is in the Player Dock. Other 3 are outside the table */
+/* 4-Player (2v2 Mode): Seat 0 is in Player Dock. Other 3 are outside table symmetrically */
 .seats-4 .seat-pos-0 { display: none !important; }
 .seats-4 .seat-pos-1 { left: 16px; top: 50%; transform: translateY(-50%); } /* Opponent 1: Left */
-.seats-4 .seat-pos-2 { top: 8px; left: 24%; transform: none; } /* Partner (Aarav): Red dot position (Top-Left) */
+.seats-4 .seat-pos-2 { top: 6px; left: 50%; transform: translateX(-50%); } /* Partner: Top Center (Opposite You) */
 .seats-4 .seat-pos-3 { right: 16px; top: 50%; transform: translateY(-50%); } /* Opponent 2: Right */
 
 /* ============================================================
@@ -1503,37 +1503,40 @@ body.bypass-rotate .app-container { display: flex !important; }
 .announcement-toast {
   position: absolute;
   top: 8px;
-  background: rgba(3, 10, 20, 0.92);
-  border: 1px solid var(--gold);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(3, 10, 20, 0.94);
+  border: 1.5px solid var(--gold);
   color: #fff;
-  padding: 4px 14px;
+  padding: 5px 16px;
   border-radius: 16px;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 800;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
-  z-index: 30;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.85), 0 0 12px rgba(245, 176, 65, 0.3);
+  z-index: 150;
+  white-space: nowrap;
   animation: fadeInOut 2.5s forwards;
 }
 
 @keyframes fadeInOut {
-  0% { opacity: 0; transform: translateY(-10px); }
-  15% { opacity: 1; transform: translateY(0); }
-  85% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-10px); }
+  0% { opacity: 0; transform: translate(-50%, -10px); }
+  15% { opacity: 1; transform: translate(-50%, 0); }
+  85% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
 /* ============================================================
    RADIAL ARENA: PLAYER HAND DOCK (COMPACT 98PX BOTTOM)
    ============================================================ */
 .player-dock {
-  height: 108px;
+  height: 128px;
   background: rgba(2, 6, 14, 0.98);
-  border-top: 1px solid rgba(0, 229, 255, 0.2);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.75);
+  border-top: 1px solid rgba(0, 229, 255, 0.25);
+  box-shadow: 0 -4px 25px rgba(0, 0, 0, 0.85);
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 4px 10px;
+  padding: 4px 10px 4px;
   gap: 12px;
   z-index: 40;
   box-sizing: border-box;
@@ -1553,7 +1556,7 @@ body.bypass-rotate .app-container { display: flex !important; }
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
   position: relative;
   transition: all 0.25s ease;
-  height: 86px;
+  height: 98px;
   box-sizing: border-box;
 }
 
@@ -1695,23 +1698,37 @@ body.bypass-rotate .app-container { display: flex !important; }
   align-items: center;
   justify-content: space-between;
   padding: 0 2px 2px;
+  height: 24px;
   min-height: 24px;
+  flex-shrink: 0;
 }
 
 /* Suit Filter Tabs (Pill Buttons) */
-.suit-filters { display: flex; gap: 4px; }
+.suit-filters { display: flex; gap: 4px; align-items: center; }
 
 .suit-filter-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   color: #bdc3c7;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 12px;
-  font-size: 0.62rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
   cursor: pointer;
   transition: all 0.18s;
   font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.suit-filter-btn .filter-suit-glyph {
+  font-size: 0.76rem;
+  line-height: 1;
+}
+
+.suit-filter-btn .filter-suit-glyph.red {
+  color: #ff4d4d;
 }
 
 .suit-filter-btn.active {
@@ -1719,7 +1736,11 @@ body.bypass-rotate .app-container { display: flex !important; }
   color: #000;
   border-color: var(--team-a-color);
   box-shadow: 0 0 10px var(--team-a-glow);
-  font-weight: 800;
+  font-weight: 900;
+}
+
+.suit-filter-btn.active .filter-suit-glyph.red {
+  color: #8a0000;
 }
 
 .turn-action-bar {
@@ -1766,7 +1787,9 @@ body.bypass-rotate .app-container { display: flex !important; }
   justify-content: safe center;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 14px 16px 2px;
+  padding: 14px 12px 3px;
+  min-height: 92px;
+  box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
 }
@@ -2213,7 +2236,7 @@ body.bypass-rotate .app-container { display: flex !important; }
 
 /* Elevated Selected Card */
 .play-card.selected {
-  transform: translateY(-11px) scale(1.04) !important;
+  transform: translateY(-9px) scale(1.03) !important;
   border: 2px solid var(--gold) !important;
   box-shadow: 0 0 16px var(--gold-glow), 0 6px 18px rgba(0, 0, 0, 0.85) !important;
   z-index: 120 !important;
@@ -2371,7 +2394,7 @@ body.bypass-rotate .app-container { display: flex !important; }
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 .seats-4 .sweeping-to-seat-2 {
-  transform: translate(-130px, -70px) scale(0.12) !important;
+  transform: translate(0, -95px) scale(0.12) !important;
   opacity: 0 !important;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
@@ -2448,12 +2471,12 @@ body.bypass-rotate .app-container { display: flex !important; }
 
 @media (max-height: 440px) {
   .player-dock {
-    height: 86px;
-    padding: 1px 6px;
+    height: 104px;
+    padding: 2px 6px;
     gap: 8px;
   }
   .my-dock-seat {
-    height: 74px;
+    height: 84px;
     padding: 2px 6px;
     gap: 6px;
   }
@@ -2474,8 +2497,9 @@ body.bypass-rotate .app-container { display: flex !important; }
     font-size: 0.48rem;
   }
   .dock-header {
-    min-height: 20px;
-    padding: 0 2px 1px;
+    min-height: 18px;
+    height: 18px;
+    padding: 0 2px;
   }
   .suit-filter-btn {
     font-size: 0.56rem;
@@ -2488,11 +2512,18 @@ body.bypass-rotate .app-container { display: flex !important; }
     font-size: 0.65rem;
     padding: 2px 8px;
   }
+  .player-hand-cards {
+    min-height: 76px;
+    padding: 12px 8px 2px;
+  }
   .play-card {
     width: 44px;
-    height: 62px;
+    height: 58px;
     margin-right: -12px;
     overflow: hidden !important;
+  }
+  .play-card.selected {
+    transform: translateY(-7px) scale(1.03) !important;
   }
   .play-card .card-rank { font-size: 0.72rem; }
   .play-card .card-suit { font-size: 0.56rem; }
@@ -2544,4 +2575,108 @@ body.bypass-rotate .app-container { display: flex !important; }
   }
 }
 
+/* Rules button in Lobby Header */
+.btn-lobby-rules {
+  background: rgba(245, 176, 65, 0.12);
+  border: 1px solid rgba(245, 176, 65, 0.35);
+  color: var(--gold);
+  border-radius: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-lobby-rules:hover {
+  background: rgba(245, 176, 65, 0.25);
+  transform: scale(1.04);
+}
+
+/* Leave Table Button in HUD */
+.btn-leave {
+  background: rgba(231, 76, 60, 0.18) !important;
+  border-color: rgba(231, 76, 60, 0.45) !important;
+  color: #ff6b6b !important;
+}
+.btn-leave:hover {
+  background: rgba(231, 76, 60, 0.35) !important;
+  color: #fff !important;
+  transform: scale(1.08);
+}
+
+/* Rules / How to Play Modal */
+.rules-modal-card {
+  max-width: 520px !important;
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 16px 20px;
+}
+.rules-modal-card .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+.rules-modal-card .modal-header h3 {
+  font-size: 1rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rules-body {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+.rule-item {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.rule-item h4 {
+  font-size: 0.8rem;
+  color: #fff;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.rule-item p {
+  font-size: 0.72rem;
+  color: #bdc3c7;
+  line-height: 1.4;
+}
+
+/* Leave Table Modal */
+.leave-modal-card {
+  max-width: 380px !important;
+  padding: 18px 22px;
+  text-align: center;
+}
+.leave-modal-card .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.leave-instructions {
+  font-size: 0.82rem;
+  color: #bdc3c7;
+  line-height: 1.45;
+}
+
 .hidden { display: none !important; }
+

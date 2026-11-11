@@ -13,11 +13,18 @@ let socket;
 if (customServerUrl && window.location.hostname.includes('netlify.app')) {
   socket = io(customServerUrl, { transports: ['websocket', 'polling'] });
 } else {
-  socket = io();
+  socket = io({ transports: ['websocket', 'polling'] });
 }
 
 socket.on('connect', () => {
   console.log('Connected to Mindi Kot server:', socket.id);
+  if (currentRoomCode && sessionToken) {
+    socket.emit('join_room', { roomCode: currentRoomCode, sessionToken }, (res) => {
+      if (res && res.success) {
+        console.log('Auto re-synced session with room:', currentRoomCode);
+      }
+    });
+  }
 });
 socket.on('connect_error', (err) => {
   console.warn('Socket connection error:', err.message);
@@ -36,6 +43,7 @@ let isMyActiveTurn = false;
 let previousTurnId = null;
 let currentRemainingSeconds = 30;
 let currentHukum = null;
+let lastDealtRoundNum = null;
 
 // Unlock Audio on first user interaction anywhere
 window.addEventListener('click', () => sounds.init(), { once: true });
@@ -77,6 +85,20 @@ function initHotspotInfo() {
   const qrModalUrl = document.getElementById('qr-modal-url');
   const btnCopyModal = document.getElementById('btn-copy-modal-url');
   const qrContainer = document.getElementById('qrcode-container');
+  const hotspotLabel = document.querySelector('.hotspot-label');
+  const hotspotIcon = document.querySelector('.hotspot-icon');
+
+  const isCloudHost = window.location.protocol === 'https:' || 
+    (window.location.hostname.includes('.') && 
+     !window.location.hostname.match(/^(localhost|127\.|192\.168\.|10\.)/));
+
+  if (isCloudHost) {
+    currentHotspotUrl = window.location.origin;
+    if (hotspotLabel) hotspotLabel.textContent = '🌐 ONLINE GAME LINK (RENDER):';
+    if (hotspotIcon) hotspotIcon.innerHTML = '<i class="fa-solid fa-globe"></i>';
+    if (urlDisplay) urlDisplay.textContent = currentHotspotUrl;
+    if (qrModalUrl) qrModalUrl.textContent = currentHotspotUrl;
+  }
 
   // Fetch host IP from backend API
   fetch('/api/network-info')
@@ -84,6 +106,10 @@ function initHotspotInfo() {
     .then((data) => {
       if (data && data.hotspotUrl) {
         currentHotspotUrl = data.hotspotUrl;
+        if (data.isCloudHost && hotspotLabel) {
+          hotspotLabel.textContent = '🌐 ONLINE GAME LINK (RENDER):';
+          if (hotspotIcon) hotspotIcon.innerHTML = '<i class="fa-solid fa-globe"></i>';
+        }
         if (urlDisplay) urlDisplay.textContent = currentHotspotUrl;
         if (qrModalUrl) qrModalUrl.textContent = currentHotspotUrl;
       }
@@ -95,9 +121,14 @@ function initHotspotInfo() {
 
   if (btnCopy) {
     btnCopy.onclick = () => {
-      navigator.clipboard.writeText(currentHotspotUrl).then(() => {
-        showToast('📋 Hotspot Link Copied!');
-      }).catch(() => fallbackCopyText(currentHotspotUrl));
+      const copyUrl = currentRoomCode ? `${currentHotspotUrl}?room=${currentRoomCode}` : currentHotspotUrl;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(copyUrl).then(() => {
+          showToast('📋 Game Link Copied!');
+        }).catch(() => fallbackCopyText(copyUrl));
+      } else {
+        fallbackCopyText(copyUrl);
+      }
     };
   }
 
@@ -105,12 +136,13 @@ function initHotspotInfo() {
     btnShowQr.onclick = () => {
       if (!qrModal) return;
       qrModal.classList.remove('hidden');
-      if (qrModalUrl) qrModalUrl.textContent = currentHotspotUrl;
+      const targetUrl = currentRoomCode ? `${currentHotspotUrl}?room=${currentRoomCode}` : currentHotspotUrl;
+      if (qrModalUrl) qrModalUrl.textContent = targetUrl;
 
       if (qrContainer && typeof QRCode !== 'undefined') {
         qrContainer.innerHTML = '';
         new QRCode(qrContainer, {
-          text: currentHotspotUrl,
+          text: targetUrl,
           width: 170,
           height: 170,
           colorDark: '#04101e',
@@ -129,9 +161,14 @@ function initHotspotInfo() {
 
   if (btnCopyModal) {
     btnCopyModal.onclick = () => {
-      navigator.clipboard.writeText(currentHotspotUrl).then(() => {
-        showToast('📋 Link Copied!');
-      }).catch(() => fallbackCopyText(currentHotspotUrl));
+      const targetUrl = currentRoomCode ? `${currentHotspotUrl}?room=${currentRoomCode}` : currentHotspotUrl;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(targetUrl).then(() => {
+          showToast('📋 Link Copied!');
+        }).catch(() => fallbackCopyText(targetUrl));
+      } else {
+        fallbackCopyText(targetUrl);
+      }
     };
   }
 }
@@ -208,6 +245,18 @@ tabBtnJoin.addEventListener('click', () => {
   createPanel.classList.remove('active');
 });
 
+// Auto-fill Room Code if shared via link (?room=CODE)
+const queryRoom = urlParams.get('room');
+if (queryRoom) {
+  const cleanCode = queryRoom.trim().toUpperCase().substring(0, 8);
+  const joinInput = document.getElementById('join-room-code');
+  if (joinInput) joinInput.value = cleanCode;
+  tabBtnJoin.click();
+  setTimeout(() => {
+    showToast(`🎮 Room ${cleanCode} detected! Enter your name & click Join.`);
+  }, 500);
+}
+
 // --- CREATE ROOM ---
 document.getElementById('btn-create-room').addEventListener('click', () => {
   triggerFullscreen();
@@ -236,6 +285,7 @@ document.getElementById('btn-join-room').addEventListener('click', () => {
   triggerFullscreen();
   const playerName = document.getElementById('join-player-name').value.trim() || 'Player';
   const roomCode = document.getElementById('join-room-code').value.trim().toUpperCase();
+  const preferredTeam = document.getElementById('join-preferred-team')?.value || null;
 
   if (!roomCode || roomCode.length < 4) {
     alert('Please enter a valid 4-digit Room Code.');
@@ -244,7 +294,7 @@ document.getElementById('btn-join-room').addEventListener('click', () => {
 
   socket.emit(
     'join_room',
-    { roomCode, playerName, sessionToken },
+    { roomCode, playerName, sessionToken, requestedTeam: preferredTeam },
     (res) => {
       if (res.success) {
         currentRoomCode = res.roomCode;
@@ -281,11 +331,37 @@ function fallbackCopyText(text) {
   textarea.select();
   try {
     document.execCommand('copy');
-    showToast(`Room Code ${text} copied!`);
+    showToast(`Link / Code copied: ${text}`);
   } catch (e) {
-    showToast(`Room Code: ${text}`);
+    showToast(`Code: ${text}`);
   }
   document.body.removeChild(textarea);
+}
+
+// --- SHARE INVITE LINK ---
+const btnShareRoom = document.getElementById('btn-share-room');
+if (btnShareRoom) {
+  btnShareRoom.addEventListener('click', () => {
+    if (!currentRoomCode) return;
+    const shareUrl = `${window.location.origin}?room=${currentRoomCode}`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Mindi Kot Game Table',
+        text: `Play Mindi Kot with me! Join Room: ${currentRoomCode}`,
+        url: shareUrl
+      }).catch(() => {
+        fallbackCopyText(shareUrl);
+      });
+    } else {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showToast(`🎮 Invite Link Copied! (${shareUrl})`);
+        }).catch(() => fallbackCopyText(shareUrl));
+      } else {
+        fallbackCopyText(shareUrl);
+      }
+    }
+  });
 }
 
 // --- FILL BOTS ---
@@ -396,7 +472,7 @@ socket.on('deck_shuffled', (data) => {
   }
   const countVal = document.getElementById('shuffle-count-val');
   if (countVal) countVal.textContent = data.shuffleCount;
-  showToast(`🔀 Ket Shuffled (${data.shuffleCount}x)!`);
+  showToast(`🔀 Ket Shuffled (${data.shuffleCount}x)! Naye random pate mix hue.`);
 });
 
 socket.on('dealing_started', (data) => {
@@ -464,6 +540,10 @@ socket.on('trick_cleared', () => {
   if (leadIndicator) leadIndicator.classList.add('hidden');
 });
 
+socket.on('round_started', (data) => {
+  showToast(`🏁 Round ${data.roundNumber} Started!`);
+});
+
 socket.on('round_finished', (data) => {
   sounds.playVictory();
   showRoundModal(data.roundSummary);
@@ -475,27 +555,18 @@ socket.on('turn_timer_tick', (data) => {
   updateTurnStatusText();
 });
 
-// Update Circular SVG Timer Ring on Active Seat (Both Table and Player Dock)
+// Circular SVG Glow Ring on Active Seat (Steady Glowing Indicator - No Rush/No Timer)
 function updateSvgTimerRing(seconds) {
   const rings = document.querySelectorAll('.active-turn .timer-progress');
   if (!rings.length) return;
 
-  const circumference = 132;
-  const offset = circumference - (seconds / 30) * circumference;
   rings.forEach((ring) => {
-    ring.style.strokeDashoffset = offset;
-
-    if (seconds > 15) {
-      ring.style.stroke = '#00e5ff'; // Cyan
-    } else if (seconds > 6) {
-      ring.style.stroke = '#f1c40f'; // Yellow
-    } else {
-      ring.style.stroke = '#e74c3c'; // Red
-    }
+    ring.style.strokeDashoffset = 0;
+    ring.style.stroke = '#00e5ff';
   });
 }
 
-// Live Countdown & Status Text in Player Dock
+// Live Status Text in Player Dock (Relaxed turn, no 30s countdown pressure)
 function updateTurnStatusText() {
   const turnStatus = document.getElementById('turn-status-text');
   if (!turnStatus) return;
@@ -503,7 +574,7 @@ function updateTurnStatusText() {
   if (isMyActiveTurn) {
     turnStatus.textContent = selectedCardId
       ? '👉 Card Selected! Tap card again or THROW to play'
-      : `👉 YOUR TURN (${currentRemainingSeconds}s)! Tap a legal card`;
+      : '👉 YOUR TURN! Tap a legal card';
     turnStatus.style.color = '#00e5ff';
   } else {
     turnStatus.textContent = `Turn: ${currentActivePlayerName || 'Waiting...'}`;
@@ -602,9 +673,11 @@ function showCenterDeckStage(state) {
     instructionText.innerHTML = '<i class="fa-solid fa-hand-pointer"></i> Ket par click karein baari lene ke liye!';
   }
 
-  // Clear dock cards while Ket is active on table
-  const dockCards = document.getElementById('dock-hand-cards');
+  // Clear dock cards and hide dock controls completely while Ket is active on table
+  const dockCards = document.getElementById('player-hand-cards');
   if (dockCards) dockCards.innerHTML = '';
+  const dockWrapper = document.querySelector('.dock-cards-wrapper');
+  if (dockWrapper) dockWrapper.style.visibility = 'hidden';
 }
 
 function startDealingSequence(data) {
@@ -634,12 +707,16 @@ function startDealingSequence(data) {
 
     isDealingInProgress = false;
 
-    // Render player hand now that deal is complete!
-    if (pendingGameState) {
+    // Show dock controls and render cards now that dealing animation finished
+    const dockWrapper = document.querySelector('.dock-cards-wrapper');
+    if (dockWrapper) dockWrapper.style.visibility = 'visible';
+
+    if (currentHandCards && currentHandCards.length > 0) {
+      updateSuitCounts(currentHandCards);
       renderFilteredHand();
       updateTurnStatusText();
 
-      if (pendingGameState.activePlayerId === myPlayerId) {
+      if (pendingGameState && pendingGameState.activePlayerId === myPlayerId) {
         sounds.playTurnAlert();
       }
     }
@@ -664,10 +741,10 @@ function animateDealingCards(maxPlayers, firstTurnIndex, onComplete) {
   ];
 
   const coords4 = [
-    { x: 0, y: 160 },    // Seat 0 (Me)
-    { x: -160, y: 0 },   // Seat 1
-    { x: -70, y: -100 }, // Seat 2
-    { x: 160, y: 0 }     // Seat 3
+    { x: 0, y: 160 },   // Seat 0 (Me)
+    { x: -160, y: 0 },  // Seat 1
+    { x: 0, y: -100 },  // Seat 2 (Partner - Top Center)
+    { x: 160, y: 0 }    // Seat 3
   ];
 
   const coords = maxPlayers === 4 ? coords4 : coords6;
@@ -768,11 +845,13 @@ function updateGameUI(state) {
   const roundNumPill = document.getElementById('round-num-pill');
   if (roundNumPill) roundNumPill.textContent = `R${state.roundNumber}`;
 
+  const totalTricks = state.maxPlayers === 6 ? 17 : 13;
+  const currentTrick = Math.min(state.tricksWon.teamA + state.tricksWon.teamB + 1, totalTricks);
   const currentTrickNum = document.getElementById('current-trick-num');
-  if (currentTrickNum) currentTrickNum.textContent = state.tricksWon.teamA + state.tricksWon.teamB + 1;
+  if (currentTrickNum) currentTrickNum.textContent = currentTrick;
 
   const totalTricksNum = document.getElementById('total-tricks-num');
-  if (totalTricksNum) totalTricksNum.textContent = state.maxPlayers === 6 ? 17 : 13;
+  if (totalTricksNum) totalTricksNum.textContent = totalTricks;
 
   // 2. Hukum Badge
   const hukumBadge = document.getElementById('hukum-badge');
@@ -802,12 +881,18 @@ function updateGameUI(state) {
   isMyActiveTurn = state.activePlayerId === myPlayerId;
   currentActivePlayerName = state.activePlayerName || 'Waiting...';
   currentHandCards = state.myHand || [];
-  updateSuitCounts(currentHandCards);
 
-  // Render hand cards only if dealing phase has completed
+  const dockWrapper = document.querySelector('.dock-cards-wrapper');
+
+  // Render hand cards & suit pills only if dealing phase has completed
   if (!state.isDealingPhase && !isDealingInProgress) {
+    if (dockWrapper) dockWrapper.style.visibility = 'visible';
+    updateSuitCounts(currentHandCards);
     renderFilteredHand();
     updateTurnStatusText();
+  } else {
+    // During dealing phase, keep suit pills and card dock hidden to prevent leaking
+    if (dockWrapper) dockWrapper.style.visibility = 'hidden';
   }
 }
 
@@ -1146,12 +1231,6 @@ function renderFilteredHand() {
           updateTurnStatusText();
         }
       });
-
-      // Double-click/double-tap to immediately play card (backup)
-      cardEl.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        playSelectedCard(card.id);
-      });
     } else if (isMyActiveTurn && !card.isLegal) {
       cardEl.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1163,6 +1242,18 @@ function renderFilteredHand() {
         if (turnTextEl) {
           turnTextEl.innerHTML = `<span style="color:#ff6b6b;"><i class="fa-solid fa-triangle-exclamation"></i> Follow lead suit!</span>`;
           setTimeout(() => { updateTurnStatusText(); }, 1200);
+        }
+      });
+    } else {
+      // Not user's active turn: Allow pre-selection for fluid move planning
+      cardEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedCardId = card.id;
+        sounds.playCardSnap();
+        updateCardSelectionVisuals();
+        const turnStatus = document.getElementById('turn-status-text');
+        if (turnStatus) {
+          turnStatus.innerHTML = `<span style="color:#00e5ff;">Pre-selected ${card.rank}${SUIT_ICONS[card.suit]}</span> <span style="color:#95a5a6; font-size: 0.65rem;">(Waiting for ${currentActivePlayerName}...)</span>`;
         }
       });
     }
@@ -1196,14 +1287,21 @@ document.addEventListener('click', (e) => {
 });
 
 // Play Card Emit
+let isMoveInFlight = false;
+
 function playSelectedCard(cardId) {
+  if (isMoveInFlight) return;
+  isMoveInFlight = true;
+
   sounds.playCardSnap();
+  if (navigator.vibrate) navigator.vibrate(25);
   btnThrowSelected.classList.add('hidden');
   selectedCardId = null;
 
   socket.emit('play_card', { roomCode: currentRoomCode, playerId: myPlayerId, cardId }, (res) => {
+    isMoveInFlight = false;
     if (!res.success) {
-      alert(res.error);
+      showToast(`Move failed: ${res.error}`);
     }
   });
 }
@@ -1262,3 +1360,59 @@ function showToast(message) {
     toast.classList.add('hidden');
   }, 2500);
 }
+
+// --- RULES / HOW TO PLAY MODAL ---
+const rulesModal = document.getElementById('rules-modal');
+const btnLobbyRules = document.getElementById('btn-lobby-rules');
+const btnHudRules = document.getElementById('btn-hud-rules');
+const btnCloseRules = document.getElementById('btn-close-rules');
+const btnGotItRules = document.getElementById('btn-got-it-rules');
+
+function openRulesModal() {
+  if (rulesModal) rulesModal.classList.remove('hidden');
+}
+
+function closeRulesModal() {
+  if (rulesModal) rulesModal.classList.add('hidden');
+}
+
+btnLobbyRules?.addEventListener('click', openRulesModal);
+btnHudRules?.addEventListener('click', openRulesModal);
+btnCloseRules?.addEventListener('click', closeRulesModal);
+btnGotItRules?.addEventListener('click', closeRulesModal);
+
+// --- LEAVE TABLE MODAL ---
+const leaveModal = document.getElementById('leave-modal');
+const btnLeaveTable = document.getElementById('btn-leave-table');
+const btnCloseLeave = document.getElementById('btn-close-leave');
+const btnCancelLeave = document.getElementById('btn-cancel-leave');
+const btnConfirmLeave = document.getElementById('btn-confirm-leave');
+
+btnLeaveTable?.addEventListener('click', () => {
+  if (leaveModal) leaveModal.classList.remove('hidden');
+});
+
+function closeLeaveModal() {
+  if (leaveModal) leaveModal.classList.add('hidden');
+}
+
+btnCloseLeave?.addEventListener('click', closeLeaveModal);
+btnCancelLeave?.addEventListener('click', closeLeaveModal);
+
+btnConfirmLeave?.addEventListener('click', () => {
+  closeLeaveModal();
+  if (currentRoomCode) {
+    socket.emit('leave_table', { roomCode: currentRoomCode, playerId: myPlayerId });
+  }
+  // Reset local state & return to lobby
+  currentRoomCode = null;
+  myPlayerId = null;
+  mySeatIndex = null;
+  selectedCardId = null;
+  currentHandCards = [];
+  gameScreen.classList.remove('active');
+  lobbyScreen.classList.add('active');
+  document.getElementById('lobby-waiting-section').classList.add('hidden');
+  document.getElementById('lobby-auth-section').classList.remove('hidden');
+  showToast('Returned to Lobby.');
+});

@@ -79,13 +79,37 @@ class GameEngine {
       }
     }
 
-    // Fisher-Yates Shuffle
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
+    // High-entropy Fisher-Yates Shuffle with crypto randomness
+    const crypto = require('crypto');
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = crypto && crypto.randomInt ? crypto.randomInt(0, i + 1) : Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
     }
 
     return deck;
+  }
+
+  // Shuffle & deal cards afresh across seated players
+  shuffleAndDealCards(startingPlayerIndex = null) {
+    const deck = this.createDeck();
+
+    this.players.forEach((p) => {
+      this.hands[p.id] = [];
+    });
+
+    const startIdx = startingPlayerIndex !== null ? startingPlayerIndex : (this.dealerIndex + 1) % this.maxPlayers;
+    for (let i = 0; i < deck.length; i++) {
+      const playerIndex = (startIdx + i) % this.maxPlayers;
+      const player = this.players[playerIndex];
+      this.hands[player.id].push(deck[i]);
+    }
+
+    // Sort cards in hand by suit & rank for clean UI
+    this.players.forEach((p) => {
+      this.sortHand(this.hands[p.id]);
+    });
   }
 
   // Initialize round & deal cards to seated players
@@ -113,23 +137,7 @@ class GameEngine {
     // First player to play is next to dealer
     this.currentTurnIndex = (this.dealerIndex + 1) % this.maxPlayers;
 
-    const deck = this.createDeck();
-
-    // Deal cards sequentially
-    this.players.forEach((p) => {
-      this.hands[p.id] = [];
-    });
-
-    for (let i = 0; i < deck.length; i++) {
-      const playerIndex = (this.dealerIndex + 1 + i) % this.maxPlayers;
-      const player = this.players[playerIndex];
-      this.hands[player.id].push(deck[i]);
-    }
-
-    // Sort cards in hand by suit & rank for better UX
-    this.players.forEach((p) => {
-      this.sortHand(this.hands[p.id]);
-    });
+    this.shuffleAndDealCards();
 
     return this.getGameState();
   }
